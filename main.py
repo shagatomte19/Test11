@@ -1,6 +1,7 @@
 import easyocr
 import fitz  # PyMuPDF for PDF handling
 import re
+import tempfile
 from fpdf import FPDF
 import streamlit as st
 import os
@@ -64,7 +65,12 @@ def process_pdf(pdf_file):
     return redacted_text, output_pdf, output_word
 
 # Function to export redacted text to PDF
-def export_to_pdf(redacted_text, output_pdf_path):
+def export_to_pdf(redacted_text):
+    # Create a temporary file for PDF
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+        tmpfile.close()  # Close the file to ensure it's saved to disk
+        output_pdf_path = tmpfile.name  # Get the path of the temporary file
+
     # Create PDF
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -73,23 +79,30 @@ def export_to_pdf(redacted_text, output_pdf_path):
     # Set font
     pdf.set_font("Arial", size=12)
 
-    # Add text
+    # Add text to the PDF
     pdf.multi_cell(0, 10, redacted_text)
 
-    # Save the redacted PDF
+    # Save the redacted PDF to the temporary file path
     pdf.output(output_pdf_path)
-    return output_pdf_path
+    
+    return output_pdf_path  # Return the path to the generated PDF
 
 # Function to export redacted text to Word
 from docx import Document
-def export_to_word(redacted_text, output_word_path):
+def export_to_word(redacted_text):
+    # Create a temporary file for Word
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmpfile:
+        tmpfile.close()  # Close the file to ensure it's saved to disk
+        output_word_path = tmpfile.name  # Get the path of the temporary file
+
     # Create a Word document
     doc = Document()
     doc.add_paragraph(redacted_text)
     
-    # Save the redacted Word document
+    # Save the redacted Word document to the temporary file path
     doc.save(output_word_path)
-    return output_word_path
+    
+    return output_word_path 
 
 # Streamlit interface
 def main():
@@ -107,12 +120,17 @@ def main():
         # Display redacted text
         st.text_area("Redacted Text", redacted_text, height=300)
 
-        # Allow users to download redacted PDF and Word documents
-        st.download_button("Download Redacted PDF", output_pdf)
-        st.download_button("Download Redacted Word Document", output_word)
+        # Allow users to download the redacted PDF
+        with open(output_pdf, "rb") as f:
+            st.download_button("Download Redacted PDF", f, file_name="redacted_output.pdf")
+
+        # Allow users to download the redacted Word document
+        with open(output_word, "rb") as f:
+            st.download_button("Download Redacted Word Document", f, file_name="redacted_output.docx")
 
 if __name__ == "__main__":
     main()
+
 
 
 
