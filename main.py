@@ -6,6 +6,8 @@ from fpdf import FPDF
 import streamlit as st
 import os
 from transformers import pipeline
+from docx import Document
+
 # Check and install model
 ner_model = pipeline("ner", model="dbmdz/bert-large-cased-finetuned-conll03-english")
 
@@ -140,6 +142,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
