@@ -1,10 +1,14 @@
-python -m spacy download en_core_web_sm
 import easyocr
 import spacy
 import fitz  # PyMuPDF for PDF handling
 import re
 from fpdf import FPDF
 import gradio as gr
+import os
+
+# Check if the model is installed, and install if not
+if not os.path.exists('en_core_web_sm'):
+    os.system('python -m spacy download en_core_web_sm')
 
 # Initialize EasyOCR (English language)
 reader = easyocr.Reader(['en'])  # Use CPU (-1)
@@ -113,5 +117,6 @@ interface = gr.Interface(
 
 # Launch the Gradio interface
 interface.launch()
+
 
 
