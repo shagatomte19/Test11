@@ -1,0 +1,6 @@
+easyocr
+spacy
+pymupdf
+python-docx
+fpdf
+gradio
