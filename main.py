@@ -3,7 +3,7 @@ import spacy
 import fitz  # PyMuPDF for PDF handling
 import re
 from fpdf import FPDF
-import gradio as gr
+import streamlit as st
 import os
 from transformers import pipeline
 # Check and install model
@@ -92,20 +92,29 @@ def export_to_word(redacted_text, output_word_path):
     doc.save(output_word_path)
     return output_word_path
 
-# Gradio interface
-interface = gr.Interface(
-    fn=process_pdf,  # Function to process the PDF and extract/redact text
-    inputs=gr.File(label="Upload PDF"),  # File input for PDF upload
-    outputs=[
-        gr.Textbox(label="Redacted Text"),  # Display the redacted text
-        gr.File(label="Download Redacted PDF"),  # Allow users to download redacted PDF
-        gr.File(label="Download Redacted Word Document")  # Allow users to download redacted Word doc
-    ],
-    live=True
-)
+# Streamlit interface
+def main():
+    st.title('AI-Powered Document Redaction System')
 
-# Launch the Gradio interface
-interface.launch()
+    # File uploader
+    uploaded_pdf = st.file_uploader("Upload a PDF document", type="pdf")
+    
+    if uploaded_pdf is not None:
+        st.write("Processing the PDF...")
+
+        # Process the PDF to extract and redact text
+        redacted_text, output_pdf, output_word = process_pdf(uploaded_pdf)
+
+        # Display redacted text
+        st.text_area("Redacted Text", redacted_text, height=300)
+
+        # Allow users to download redacted PDF and Word documents
+        st.download_button("Download Redacted PDF", output_pdf)
+        st.download_button("Download Redacted Word Document", output_word)
+
+if __name__ == "__main__":
+    main()
+
 
 
 
