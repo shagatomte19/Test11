@@ -48,23 +48,11 @@ def redact_sensitive_information(text):
         if entity['entity'] in ["B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"]:
             redacted_text = redacted_text.replace(entity['word'], "[REDACTED]")
     
+    # Also redact SSN and credit card patterns using regex
+    redacted_text = re.sub(ssn_pattern, "[REDACTED SSN]", redacted_text)
+    redacted_text = re.sub(credit_card_pattern, "[REDACTED CC]", redacted_text)
+    
     return redacted_text
-
-# Function to handle the entire document processing
-def process_pdf(pdf_file):
-    images = pdf_to_images(pdf_file)  # Convert PDF to images
-    extracted_text = ocr_from_images(images)  # Extract text from images using EasyOCR
-    redacted_text = redact_sensitive_information(extracted_text)  # Redact sensitive info
-
-    # Export the redacted text to PDF and Word
-    output_pdf = "/mnt/data/redacted_output.pdf"
-    output_word = "/mnt/data/redacted_output.docx"
-    
-    # Export to PDF and Word
-    export_to_pdf(redacted_text, output_pdf)
-    export_to_word(redacted_text, output_word)
-    
-    return redacted_text, output_pdf, output_word
 
 # Function to export redacted text to PDF
 def export_to_pdf(redacted_text):
@@ -82,8 +70,13 @@ def export_to_pdf(redacted_text):
     # Set font
     pdf.set_font("Arial", size=12)
 
-    # Add text to the PDF
-    pdf.multi_cell(0, 10, redacted_text)
+    # Add text to the PDF (handle encoding issues)
+    try:
+        pdf.multi_cell(0, 10, redacted_text.encode('latin-1', 'replace').decode('latin-1'))
+    except:
+        # Fallback for special characters
+        cleaned_text = ''.join(char if ord(char) < 128 else '?' for char in redacted_text)
+        pdf.multi_cell(0, 10, cleaned_text)
 
     # Save the redacted PDF to the temporary file path
     pdf.output(output_pdf_path)
@@ -106,16 +99,25 @@ def export_to_word(redacted_text):
     
     return output_word_path  # Return the path to the generated Word document
 
-# Function to process PDF (extract text, redact, and save output)
+# Function to handle the entire document processing
 def process_pdf(pdf_file):
-    
-    # Assuming the OCR and redaction process is correct here
-    
-    # Call export functions to generate files
-    output_pdf = export_to_pdf(redacted_text)  # Save to PDF
-    output_word = export_to_word(redacted_text)  # Save to Word
-    
-    return redacted_text, output_pdf, output_word
+    try:
+        images = pdf_to_images(pdf_file)  # Convert PDF to images
+        extracted_text = ocr_from_images(images)  # Extract text from images using EasyOCR
+        
+        if not extracted_text.strip():
+            return None, None, None
+            
+        redacted_text = redact_sensitive_information(extracted_text)  # Redact sensitive info
+
+        # Export the redacted text to PDF and Word
+        output_pdf = export_to_pdf(redacted_text)
+        output_word = export_to_word(redacted_text)
+        
+        return redacted_text, output_pdf, output_word
+    except Exception as e:
+        st.error(f"Error processing PDF: {str(e)}")
+        return None, None, None
 
 # Streamlit app function to handle file upload and download
 def main():
@@ -137,25 +139,14 @@ def main():
             st.text_area("Redacted Text", redacted_text, height=300)
 
             # Allow users to download the redacted PDF
-            with open(output_pdf, "rb") as f:
-                st.download_button("Download Redacted PDF", f, file_name="redacted_output.pdf")
+            if output_pdf and os.path.exists(output_pdf):
+                with open(output_pdf, "rb") as f:
+                    st.download_button("Download Redacted PDF", f.read(), file_name="redacted_output.pdf", mime="application/pdf")
 
             # Allow users to download the redacted Word document
-            with open(output_word, "rb") as f:
-                st.download_button("Download Redacted Word Document", f, file_name="redacted_output.docx")
+            if output_word and os.path.exists(output_word):
+                with open(output_word, "rb") as f:
+                    st.download_button("Download Redacted Word Document", f.read(), file_name="redacted_output.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
