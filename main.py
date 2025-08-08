@@ -130,19 +130,23 @@ def main():
         # Process the PDF to extract and redact text
         redacted_text, output_pdf, output_word = process_pdf(uploaded_pdf)
 
-        # Display redacted text
-        st.text_area("Redacted Text", redacted_text, height=300)
+        if redacted_text is None:
+            st.error("No redacted text found. Please ensure the document contains extractable text.")
+        else:
+            # Display redacted text
+            st.text_area("Redacted Text", redacted_text, height=300)
 
-        # Allow users to download the redacted PDF
-        with open(output_pdf, "rb") as f:
-            st.download_button("Download Redacted PDF", f, file_name="redacted_output.pdf")
+            # Allow users to download the redacted PDF
+            with open(output_pdf, "rb") as f:
+                st.download_button("Download Redacted PDF", f, file_name="redacted_output.pdf")
 
-        # Allow users to download the redacted Word document
-        with open(output_word, "rb") as f:
-            st.download_button("Download Redacted Word Document", f, file_name="redacted_output.docx")
+            # Allow users to download the redacted Word document
+            with open(output_word, "rb") as f:
+                st.download_button("Download Redacted Word Document", f, file_name="redacted_output.docx")
 
 if __name__ == "__main__":
     main()
+
 
 
 
