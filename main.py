@@ -108,7 +108,6 @@ def export_to_word(redacted_text):
 # Function to process PDF (extract text, redact, and save output)
 def process_pdf(pdf_file):
     # Assuming the OCR and redaction process is correct here
-    redacted_text = "Sample redacted text from the PDF document"
     
     # Call export functions to generate files
     output_pdf = export_to_pdf(redacted_text)  # Save to PDF
@@ -142,6 +141,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
