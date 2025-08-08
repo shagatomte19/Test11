@@ -6,7 +6,7 @@ from fpdf import FPDF
 import gradio as gr
 import os
 import subprocess
-
+import sys
 # Check and install model
 try:
     nlp = spacy.load("en_core_web_sm")
@@ -121,6 +121,7 @@ interface = gr.Interface(
 
 # Launch the Gradio interface
 interface.launch()
+
 
 
 
