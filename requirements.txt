@@ -1,6 +1,8 @@
 easyocr
-spacy
+transformers
+torch
 pymupdf
 python-docx
 fpdf
 gradio
+
