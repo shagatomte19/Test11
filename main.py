@@ -68,6 +68,7 @@ def process_pdf(pdf_file):
 
 # Function to export redacted text to PDF
 def export_to_pdf(redacted_text):
+    print(f"Redacted Text: {redacted_text[:100]}...") 
     # Create a temporary file for PDF
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
         tmpfile.close()  # Close the file to ensure it's saved to disk
@@ -107,6 +108,7 @@ def export_to_word(redacted_text):
 
 # Function to process PDF (extract text, redact, and save output)
 def process_pdf(pdf_file):
+    
     # Assuming the OCR and redaction process is correct here
     
     # Call export functions to generate files
