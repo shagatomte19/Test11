@@ -5,10 +5,14 @@ import re
 from fpdf import FPDF
 import gradio as gr
 import os
+import subprocess
 
-# Check if the model is installed, and install if not
-if not os.path.exists('en_core_web_sm'):
-    os.system('python -m spacy download en_core_web_sm')
+# Check and install model
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    subprocess.check_call([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
+    nlp = spacy.load("en_core_web_sm")
 
 # Initialize EasyOCR (English language)
 reader = easyocr.Reader(['en'])  # Use CPU (-1)
@@ -117,6 +121,7 @@ interface = gr.Interface(
 
 # Launch the Gradio interface
 interface.launch()
+
 
 
 
