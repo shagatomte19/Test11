@@ -5,20 +5,12 @@ import re
 from fpdf import FPDF
 import gradio as gr
 import os
-import subprocess
-import sys
+from transformers import pipeline
 # Check and install model
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    subprocess.check_call([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-    nlp = spacy.load("en_core_web_sm")
+ner_model = pipeline("ner", model="dbmdz/bert-large-cased-finetuned-conll03-english")
 
 # Initialize EasyOCR (English language)
 reader = easyocr.Reader(['en'])  # Use CPU (-1)
-
-# Initialize SpaCy model for NER (Named Entity Recognition)
-nlp = spacy.load("en_core_web_sm")
 
 # Regex patterns for sensitive information
 ssn_pattern = r"\b\d{3}-\d{2}-\d{4}\b"  # Social Security Number pattern
@@ -46,21 +38,14 @@ def ocr_from_images(images):
 
 # Function to process and redact sensitive information using NER and regex
 def redact_sensitive_information(text):
-    # Process text with SpaCy NER
-    doc = nlp(text)
-    
-    # Redact NER entities (like names, addresses, etc.)
     redacted_text = text
-    for ent in doc.ents:
-        if ent.label_ in ["PERSON", "GPE", "ORG"]:
-            redacted_text = redacted_text.replace(ent.text, "[REDACTED]")
+    entities = ner_model(text)
     
-    # Redact social security numbers (SSNs) using regex
-    redacted_text = re.sub(ssn_pattern, "[REDACTED SSN]", redacted_text)
+    # Redact sensitive information (such as PERSON, ORG, GPE)
+    for entity in entities:
+        if entity['entity'] in ["B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"]:
+            redacted_text = redacted_text.replace(entity['word'], "[REDACTED]")
     
-    # Redact credit card numbers using regex
-    redacted_text = re.sub(credit_card_pattern, "[REDACTED CREDIT CARD]", redacted_text)
-
     return redacted_text
 
 # Function to handle the entire document processing
@@ -121,6 +106,7 @@ interface = gr.Interface(
 
 # Launch the Gradio interface
 interface.launch()
+
 
 
 
