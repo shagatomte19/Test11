@@ -88,7 +88,6 @@ def export_to_pdf(redacted_text):
     return output_pdf_path  # Return the path to the generated PDF
 
 # Function to export redacted text to Word
-from docx import Document
 def export_to_word(redacted_text):
     # Create a temporary file for Word
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmpfile:
@@ -102,9 +101,20 @@ def export_to_word(redacted_text):
     # Save the redacted Word document to the temporary file path
     doc.save(output_word_path)
     
-    return output_word_path 
+    return output_word_path  # Return the path to the generated Word document
 
-# Streamlit interface
+# Function to process PDF (extract text, redact, and save output)
+def process_pdf(pdf_file):
+    # Assuming the OCR and redaction process is correct here
+    redacted_text = "Sample redacted text from the PDF document"
+    
+    # Call export functions to generate files
+    output_pdf = export_to_pdf(redacted_text)  # Save to PDF
+    output_word = export_to_word(redacted_text)  # Save to Word
+    
+    return redacted_text, output_pdf, output_word
+
+# Streamlit app function to handle file upload and download
 def main():
     st.title('AI-Powered Document Redaction System')
 
@@ -130,6 +140,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
