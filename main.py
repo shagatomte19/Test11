@@ -1,5 +1,4 @@
 import easyocr
-import spacy
 import fitz  # PyMuPDF for PDF handling
 import re
 from fpdf import FPDF
@@ -114,6 +113,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
