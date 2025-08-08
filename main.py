@@ -1,3 +1,4 @@
+!python -m spacy download en_core_web_sm
 import easyocr
 import spacy
 import fitz  # PyMuPDF for PDF handling
@@ -112,3 +113,4 @@ interface = gr.Interface(
 
 # Launch the Gradio interface
 interface.launch()
+
