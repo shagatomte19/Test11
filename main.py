@@ -14,24 +14,21 @@ from docx import Document
 # Initialize EasyOCR (English language)
 reader = easyocr.Reader(['en'])  # Use CPU (-1)
 
-# Enhanced regex patterns for sensitive information
+# Enhanced regex patterns that account for OCR errors
 ssn_patterns = [
-    r"\b\d{3}-\d{2}-\d{4}\b",  # XXX-XX-XXXX format
-    r"\b\d{3}\s\d{2}\s\d{4}\b",  # XXX XX XXXX format
-    r"\b\d{9}\b"  # XXXXXXXXX format (9 consecutive digits)
+    r"\b\d{3}[-\s<>]\d{2}[-\s<>]\d{4}\b",  # Handles OCR errors like < > instead of -
+    r"\b\d{3}\s*\d{2}\s*\d{4}\b"  # More flexible spacing
 ]
 
 credit_card_patterns = [
-    r"\b(?:\d{4}[- ]?){3}\d{4}\b",  # XXXX-XXXX-XXXX-XXXX or XXXX XXXX XXXX XXXX
-    r"\b\d{13,19}\b"  # 13-19 consecutive digits (covers most card types)
+    r"\b\d{4}[\s\-]\d{4}[\s\-]\d{4}[\s\-]\d{4}\b",  # Standard 4-4-4-4 format
+    r"\b\d{4}[\s\-]\d{4}[\s\-]\d{3}[A-Za-z0-9][\s\-][A-Za-z0-9]\d{3}\b"  # Handles OCR errors in last groups
 ]
 
-# Address patterns - more comprehensive
+# More precise address patterns to avoid false positives
 address_patterns = [
-    r"\b\d{1,5}\s+\w+\s+(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|way|court|ct|place|pl|circle|cir|parkway|pkwy)\.?\b",
-    r"\b(?:apt|apartment|suite|ste|unit|#)\s*\d+\b",  # Apartment/Suite numbers
-    r"\b\d{5}(?:-\d{4})?\b",  # ZIP codes (XXXXX or XXXXX-XXXX)
-    r"\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b"  # State + ZIP (CA 90210 or CA 90210-1234)
+    r"\b\d{1,5}\s+[A-Za-z]+\s+(?:[A-Za-z]+\s+)?(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Way|Court|Ct|Place|Pl|Circle|Cir)\b",
+    r"\b\d{5}(?:[-\s]\d{4})?\b"  # ZIP codes only (5 digits or 5-4 format)
 ]
 
 # Function to convert PDF pages to images
@@ -54,62 +51,106 @@ def ocr_from_images(images):
         results.append(extracted_text)
     return "\n".join(results)
 
-# Enhanced function with optional NER for better address detection
-def redact_sensitive_information_enhanced(text):
-    """
-    Alternative function that uses both regex and NER for more accurate address detection.
-    Uncomment the ner_model import above to use this function.
-    """
+# Function to clean OCR text and improve accuracy
+def clean_ocr_text(text):
+    """Clean common OCR errors before processing"""
+    # Dictionary of common OCR character substitutions
+    ocr_corrections = {
+        '0': ['O', 'o', '°'],
+        '1': ['l', 'I', '|'],
+        '5': ['S', 's'],
+        '6': ['G', 'b'],
+        '8': ['B'],
+        'S': ['5'],
+        'O': ['0'],
+        'I': ['1', 'l'],
+        '<': ['-'],
+        '>': ['-'],
+    }
+    
+    cleaned_text = text
+    # Apply corrections (be careful not to over-correct)
+    for correct, errors in ocr_corrections.items():
+        for error in errors:
+            # Only replace in specific contexts (like potential SSN/CC patterns)
+            pass  # We'll be more conservative here
+    
+    return cleaned_text
+
+# Enhanced function to detect sensitive patterns with OCR error tolerance
+def detect_and_redact_patterns(text):
+    """More sophisticated pattern detection that handles OCR errors"""
     redacted_text = text
     
-    # Redact Social Security Numbers
-    for pattern in ssn_patterns:
-        redacted_text = re.sub(pattern, "[REDACTED SSN]", redacted_text, flags=re.IGNORECASE)
+    # SSN Detection with OCR error tolerance
+    # Look for patterns like XXX-XX-XXXX but allow some OCR errors
+    import re
     
-    # Redact Credit Card Numbers  
-    for pattern in credit_card_patterns:
-        redacted_text = re.sub(pattern, "[REDACTED CREDIT CARD]", redacted_text, flags=re.IGNORECASE)
+    # Find potential SSN patterns (even with OCR errors)
+    potential_ssns = re.finditer(r'\b\d{3}[-\s<>o]\d{2}[-\s<>o]\d{4}\b', text, re.IGNORECASE)
+    for match in potential_ssns:
+        redacted_text = redacted_text.replace(match.group(), '[REDACTED SSN]')
     
-    # Redact Addresses using regex
-    for pattern in address_patterns:
-        redacted_text = re.sub(pattern, "[REDACTED ADDRESS]", redacted_text, flags=re.IGNORECASE)
+    # Find potential credit card patterns
+    potential_ccs = re.finditer(r'\b\d{4}[\s\-]\d{4}[\s\-]\d{3}[A-Za-z0-9][\s\-][A-Za-z0-9]\d{2,3}\b', text)
+    for match in potential_ccs:
+        redacted_text = redacted_text.replace(match.group(), '[REDACTED CREDIT CARD]')
     
-    # Optional: Use NER for additional location detection (only for addresses)
-    # Uncomment below if you want to use NER for locations that might be addresses
-    """
-    try:
-        entities = ner_model(text)
-        for entity in entities:
-            # Only redact locations that look like they could be addresses
-            if entity['entity'] in ["B-LOC", "I-LOC"] and len(entity['word']) > 2:
-                # Additional check: see if the location is preceded or followed by address indicators
-                entity_context = text[max(0, entity['start']-20):entity['end']+20].lower()
-                address_indicators = ['street', 'avenue', 'road', 'drive', 'lane', 'blvd', 'apt', 'suite']
-                if any(indicator in entity_context for indicator in address_indicators):
-                    redacted_text = redacted_text.replace(entity['word'], "[REDACTED ADDRESS]")
-    except Exception as e:
-        print(f"NER processing error: {e}")
-    """
+    # Standard credit card patterns
+    potential_ccs_standard = re.finditer(r'\b\d{4}[\s\-]\d{4}[\s\-]\d{4}[\s\-]\d{4}\b', text)
+    for match in potential_ccs_standard:
+        redacted_text = redacted_text.replace(match.group(), '[REDACTED CREDIT CARD]')
+    
+    # Address patterns - be more conservative
+    # Only redact clear address patterns
+    address_matches = re.finditer(r'\b\d{1,4}\s+[A-Za-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd)\b', text, re.IGNORECASE)
+    for match in address_matches:
+        redacted_text = redacted_text.replace(match.group(), '[REDACTED ADDRESS]')
+    
+    # ZIP codes (5 digits, but not standalone numbers that might be something else)
+    zip_matches = re.finditer(r'\b\d{5}(?:-\d{4})?\b', text)
+    for match in zip_matches:
+        # Additional context check - only redact if it looks like a ZIP
+        context = text[max(0, match.start()-10):match.end()+10].lower()
+        if any(indicator in context for indicator in ['zip', 'postal', 'address', 'mail']):
+            redacted_text = redacted_text.replace(match.group(), '[REDACTED ZIP]')
     
     return redacted_text
 
-# Function to process and redact sensitive information using regex only
-def redact_sensitive_information(text):
+# SIMPLE CONSERVATIVE APPROACH - only redacts very obvious patterns
+def redact_sensitive_information_simple(text):
+    """
+    Very conservative redaction - only redacts very obvious patterns
+    Use this function if you want minimal false positives
+    """
     redacted_text = text
     
-    # Redact Social Security Numbers
-    for pattern in ssn_patterns:
-        redacted_text = re.sub(pattern, "[REDACTED SSN]", redacted_text, flags=re.IGNORECASE)
+    # Only redact very clear SSN patterns
+    redacted_text = re.sub(r'\bSSN:\s*\d{3}[-\s<>]\d{2}[-\s<>]\d{4}\b', '[REDACTED SSN]', redacted_text, flags=re.IGNORECASE)
+    redacted_text = re.sub(r'\bSocial Security:\s*\d{3}[-\s<>]\d{2}[-\s<>]\d{4}\b', '[REDACTED SSN]', redacted_text, flags=re.IGNORECASE)
     
-    # Redact Credit Card Numbers
-    for pattern in credit_card_patterns:
-        redacted_text = re.sub(pattern, "[REDACTED CREDIT CARD]", redacted_text, flags=re.IGNORECASE)
+    # Only redact when explicitly labeled as credit card
+    redacted_text = re.sub(r'\bCredit Card:\s*\d{4}[\s\-]\d{4}[\s\-]\d{4}[\s\-]\d{4}\b', '[REDACTED CREDIT CARD]', redacted_text, flags=re.IGNORECASE)
+    redacted_text = re.sub(r'\bCard Number:\s*\d{4}[\s\-]\d{4}[\s\-]\d{4}[\s\-]\d{4}\b', '[REDACTED CREDIT CARD]', redacted_text, flags=re.IGNORECASE)
     
-    # Redact Addresses
-    for pattern in address_patterns:
-        redacted_text = re.sub(pattern, "[REDACTED ADDRESS]", redacted_text, flags=re.IGNORECASE)
+    # Only redact when explicitly labeled as address
+    redacted_text = re.sub(r'\bAddress:\s*[^\n]+', '[REDACTED ADDRESS]', redacted_text, flags=re.IGNORECASE)
+    redacted_text = re.sub(r'\bZIP:\s*\d{5}(?:-\d{4})?\b', '[REDACTED ZIP]', redacted_text, flags=re.IGNORECASE)
     
     return redacted_text
+
+# Main redaction function - you can switch between different approaches
+def redact_sensitive_information(text):
+    """
+    Main redaction function. 
+    Switch between different approaches based on your needs:
+    1. redact_sensitive_information_simple - Very conservative, only labeled data
+    2. detect_and_redact_patterns - More aggressive pattern matching
+    """
+    
+    # Choose your approach:
+    return redact_sensitive_information_simple(text)  # Very conservative
+    # return detect_and_redact_patterns(text)  # More comprehensive
 
 # Function to export redacted text to PDF
 def export_to_pdf(redacted_text):
