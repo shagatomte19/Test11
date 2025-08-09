@@ -139,18 +139,20 @@ def redact_sensitive_information_simple(text):
     
     return redacted_text
 
-# Main redaction function - you can switch between different approaches
-def redact_sensitive_information(text):
+# Main redaction function - now accepts mode parameter
+def redact_sensitive_information(text, mode="conservative"):
     """
-    Main redaction function. 
-    Switch between different approaches based on your needs:
-    1. redact_sensitive_information_simple - Very conservative, only labeled data
-    2. detect_and_redact_patterns - More aggressive pattern matching
+    Main redaction function with selectable modes.
+    
+    Args:
+        text: Input text to redact
+        mode: "conservative" or "aggressive"
     """
     
-    # Choose your approach:
-    return redact_sensitive_information_simple(text)  # Very conservative
-    # return detect_and_redact_patterns(text)  # More comprehensive
+    if mode == "conservative":
+        return redact_sensitive_information_simple(text)
+    else:
+        return detect_and_redact_patterns(text)
 
 # Function to export redacted text to PDF
 def export_to_pdf(redacted_text):
@@ -198,15 +200,17 @@ def export_to_word(redacted_text):
     return output_word_path  # Return the path to the generated Word document
 
 # Function to handle the entire document processing
-def process_pdf(pdf_file):
+def process_pdf(pdf_file, redaction_mode="conservative"):
     try:
         images = pdf_to_images(pdf_file)  # Convert PDF to images
         extracted_text = ocr_from_images(images)  # Extract text from images using EasyOCR
         
         if not extracted_text.strip():
             return None, None, None
-            
-        redacted_text = redact_sensitive_information(extracted_text)  # Redact sensitive info
+        
+        # Use the selected redaction mode
+        mode = "conservative" if "Conservative" in redaction_mode else "aggressive"
+        redacted_text = redact_sensitive_information(extracted_text, mode=mode)  # Redact sensitive info
 
         # Export the redacted text to PDF and Word
         output_pdf = export_to_pdf(redacted_text)
@@ -219,32 +223,338 @@ def process_pdf(pdf_file):
 
 # Streamlit app function to handle file upload and download
 def main():
-    st.title('AI-Powered Document Redaction System')
-
-    # File uploader
-    uploaded_pdf = st.file_uploader("Upload a PDF document", type="pdf")
+    # Page configuration
+    st.set_page_config(
+        page_title="AI Document Redaction System",
+        page_icon="🔒",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
     
-    if uploaded_pdf is not None:
-        st.write("Processing the PDF...")
-
-        # Process the PDF to extract and redact text
-        redacted_text, output_pdf, output_word = process_pdf(uploaded_pdf)
-
-        if redacted_text is None:
-            st.error("No redacted text found. Please ensure the document contains extractable text.")
-        else:
-            # Display redacted text
-            st.text_area("Redacted Text", redacted_text, height=300)
-
-            # Allow users to download the redacted PDF
-            if output_pdf and os.path.exists(output_pdf):
-                with open(output_pdf, "rb") as f:
-                    st.download_button("Download Redacted PDF", f.read(), file_name="redacted_output.pdf", mime="application/pdf")
-
-            # Allow users to download the redacted Word document
-            if output_word and os.path.exists(output_word):
-                with open(output_word, "rb") as f:
-                    st.download_button("Download Redacted Word Document", f.read(), file_name="redacted_output.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    # Custom CSS for better styling
+    st.markdown("""
+    <style>
+    .main-header {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        text-align: center;
+        color: white;
+    }
+    
+    .feature-card {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+        margin: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stats-card {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e0e0e0;
+    }
+    
+    .success-message {
+        background: #d4edda;
+        color: #155724;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .footer {
+        text-align: center;
+        padding: 2rem;
+        color: #666;
+        border-top: 1px solid #eee;
+        margin-top: 3rem;
+        font-size: 0.9rem;
+    }
+    
+    .redaction-preview {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .upload-section {
+        border: 2px dashed #667eea;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+        background: #f8f9ff;
+        margin: 1rem 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header
+    st.markdown("""
+    <div class="main-header">
+        <h1>🔒 AI-Powered Document Redaction System</h1>
+        <p>Securely redact sensitive information from your PDF documents</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sidebar with features and settings
+    with st.sidebar:
+        st.markdown("### 🎛️ Settings & Info")
+        
+        # Redaction mode selection
+        st.markdown("**Redaction Mode:**")
+        redaction_mode = st.radio(
+            "",
+            ["Conservative (Labeled data only)", "Aggressive (Pattern matching)"],
+            help="Conservative mode only redacts explicitly labeled sensitive data. Aggressive mode uses pattern matching to find unlabeled sensitive information."
+        )
+        
+        st.markdown("---")
+        
+        # Features info
+        st.markdown("### ✨ Features")
+        st.markdown("""
+        - 🔍 **OCR Text Extraction**
+        - 🏛️ **Social Security Numbers**
+        - 💳 **Credit Card Details**
+        - 🏠 **Address Information**
+        - 📄 **PDF Export**
+        - 📝 **Word Export**
+        """)
+        
+        st.markdown("---")
+        
+        # Statistics placeholder
+        st.markdown("### 📊 Statistics")
+        stats_placeholder = st.empty()
+        
+        st.markdown("---")
+        
+        # Security notice
+        st.markdown("### 🛡️ Security Notice")
+        st.info("Your documents are processed locally and are not stored or transmitted to external servers.")
+    
+    # Main content area
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # File upload section
+        st.markdown("""
+        <div class="upload-section">
+            <h3>📄 Upload Your Document</h3>
+            <p>Select a PDF document to redact sensitive information</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        uploaded_pdf = st.file_uploader(
+            "",
+            type="pdf",
+            help="Upload a PDF document containing sensitive information"
+        )
+        
+        if uploaded_pdf is not None:
+            # File info
+            file_size = len(uploaded_pdf.getvalue()) / 1024  # KB
+            st.success(f"✅ File uploaded: **{uploaded_pdf.name}** ({file_size:.1f} KB)")
+            
+            # Processing section
+            with st.expander("🔧 Processing Options", expanded=True):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    show_original = st.checkbox("Show original text", value=False)
+                with col_b:
+                    auto_download = st.checkbox("Auto-generate downloads", value=True)
+            
+            # Process button
+            if st.button("🚀 Process Document", type="primary", use_container_width=True):
+                # Progress bar and status
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                status_text.text("🔄 Initializing OCR engine...")
+                progress_bar.progress(10)
+                
+                status_text.text("📖 Extracting text from PDF...")
+                progress_bar.progress(30)
+                
+                # Process the PDF
+                redacted_text, output_pdf, output_word = process_pdf(uploaded_pdf, redaction_mode)
+                
+                status_text.text("🔍 Applying redaction patterns...")
+                progress_bar.progress(70)
+                
+                status_text.text("📄 Generating output files...")
+                progress_bar.progress(90)
+                
+                progress_bar.progress(100)
+                status_text.text("✅ Processing complete!")
+                
+                if redacted_text is None:
+                    st.error("❌ No text could be extracted. Please ensure the document contains readable text.")
+                else:
+                    # Success message
+                    st.markdown("""
+                    <div class="success-message">
+                        <strong>🎉 Processing completed successfully!</strong><br>
+                        Your document has been processed and sensitive information has been redacted.
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Display statistics
+                    original_length = len(uploaded_pdf.getvalue())
+                    redacted_length = len(redacted_text)
+                    redactions_count = redacted_text.count('[REDACTED')
+                    
+                    stats_placeholder.markdown(f"""
+                    <div class="stats-card">
+                        <strong>{redactions_count}</strong><br>
+                        <small>Items Redacted</small>
+                    </div>
+                    <div class="stats-card" style="margin-top: 0.5rem;">
+                        <strong>{redacted_length:,}</strong><br>
+                        <small>Characters Processed</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Results section
+                    st.markdown("### 📋 Results")
+                    
+                    # Tabs for different views
+                    tab1, tab2, tab3 = st.tabs(["📄 Redacted Text", "📊 Summary", "⚙️ Settings"])
+                    
+                    with tab1:
+                        if show_original:
+                            col_orig, col_red = st.columns(2)
+                            with col_orig:
+                                st.markdown("**Original Text (Preview):**")
+                                # Show first part of original (you'd need to store this)
+                                st.text_area("", "Original text would be shown here...", height=300, disabled=True)
+                            with col_red:
+                                st.markdown("**Redacted Text:**")
+                                st.text_area("", redacted_text, height=300, disabled=True)
+                        else:
+                            st.markdown("**Redacted Text:**")
+                            st.markdown(f'<div class="redaction-preview">{redacted_text}</div>', unsafe_allow_html=True)
+                    
+                    with tab2:
+                        # Summary metrics
+                        col_metric1, col_metric2, col_metric3, col_metric4 = st.columns(4)
+                        
+                        with col_metric1:
+                            ssn_count = redacted_text.count('[REDACTED SSN]')
+                            st.metric("SSN Redacted", ssn_count)
+                        
+                        with col_metric2:
+                            cc_count = redacted_text.count('[REDACTED CREDIT CARD]')
+                            st.metric("Credit Cards", cc_count)
+                        
+                        with col_metric3:
+                            addr_count = redacted_text.count('[REDACTED ADDRESS]')
+                            st.metric("Addresses", addr_count)
+                        
+                        with col_metric4:
+                            total_redactions = redactions_count
+                            st.metric("Total Redactions", total_redactions)
+                        
+                        # Redaction breakdown
+                        if redactions_count > 0:
+                            st.markdown("### 📊 Redaction Breakdown")
+                            redaction_data = {
+                                "Type": ["SSN", "Credit Cards", "Addresses", "Other"],
+                                "Count": [ssn_count, cc_count, addr_count, max(0, total_redactions - ssn_count - cc_count - addr_count)]
+                            }
+                            st.bar_chart(redaction_data, x="Type", y="Count")
+                    
+                    with tab3:
+                        st.markdown("**Current Settings:**")
+                        st.write(f"- Redaction Mode: {redaction_mode}")
+                        st.write(f"- Show Original: {show_original}")
+                        st.write(f"- Auto Download: {auto_download}")
+                    
+                    # Download section
+                    st.markdown("### 💾 Download Files")
+                    
+                    download_col1, download_col2 = st.columns(2)
+                    
+                    with download_col1:
+                        if output_pdf and os.path.exists(output_pdf):
+                            with open(output_pdf, "rb") as f:
+                                st.download_button(
+                                    "📄 Download Redacted PDF",
+                                    f.read(),
+                                    file_name="redacted_document.pdf",
+                                    mime="application/pdf",
+                                    use_container_width=True
+                                )
+                    
+                    with download_col2:
+                        if output_word and os.path.exists(output_word):
+                            with open(output_word, "rb") as f:
+                                st.download_button(
+                                    "📝 Download Word Document",
+                                    f.read(),
+                                    file_name="redacted_document.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    use_container_width=True
+                                )
+    
+    with col2:
+        # Tips and information
+        st.markdown("### 💡 Tips")
+        
+        st.markdown("""
+        <div class="feature-card">
+            <h4>🎯 Best Practices</h4>
+            <ul>
+                <li>Ensure PDF text is selectable</li>
+                <li>Review redacted output carefully</li>
+                <li>Use conservative mode for higher accuracy</li>
+                <li>Check download files before sharing</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="feature-card">
+            <h4>🔍 What Gets Redacted</h4>
+            <ul>
+                <li><strong>SSN:</strong> XXX-XX-XXXX format</li>
+                <li><strong>Credit Cards:</strong> 16-digit numbers</li>
+                <li><strong>Addresses:</strong> Street addresses</li>
+                <li><strong>ZIP Codes:</strong> 5 or 9-digit codes</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="feature-card">
+            <h4>⚠️ Limitations</h4>
+            <ul>
+                <li>OCR quality affects accuracy</li>
+                <li>Handwritten text may not be detected</li>
+                <li>Complex layouts may cause issues</li>
+                <li>Always manual review recommended</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Footer
+    st.markdown("""
+    <div class="footer">
+        <hr>
+        <p>🚀 Made with ❤️ by <strong>Enamul Hasan Shagato</strong></p>
+        <p><small>AI-Powered Document Redaction System | Protecting Your Privacy</small></p>
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
